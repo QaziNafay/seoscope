@@ -1,6 +1,6 @@
 # SEOScope — Free SEO Analyzer
 
-Analyze any webpage for SEO issues. Get a score, meta tags breakdown, heading structure audit, link analysis, social preview checks, keyword density, and actionable recommendations.
+Analyze any webpage for SEO issues. Get a score, meta tags breakdown, heading structure audit, link analysis, technical SEO checks, keyword density, and actionable recommendations.
 
 Live demo: [seoscope.vercel.app](https://seoscope.vercel.app)
 
@@ -10,10 +10,10 @@ Live demo: [seoscope.vercel.app](https://seoscope.vercel.app)
 
 - **SEO Score** — 0–100 rating based on industry best practices
 - **Meta Tags** — title, description, keywords, canonical, robots, viewport, charset, favicon
+- **Technical SEO** — HTTPS, compression, structured data, crawlability, doctype, language, hreflang, sitemap, HTTP protocol, and page size — each with expandable explanations
 - **Headings** — H1/H2/H3 structure with missing/multiple H1 warnings
 - **Images** — alt attribute audit with missing-alt counts
 - **Links** — internal vs external breakdown, nofollow detection
-- **Social** — Open Graph (og:) and Twitter Card meta tags
 - **Keywords** — top 30 words by frequency with density % and bar chart
 - **Recommendations** — prioritized list of actionable fixes
 - **Mobile-friendly** — responsive UI, works on any device
@@ -54,7 +54,7 @@ npm start
 { "url": "https://example.com" }
 ```
 
-Returns the full `AnalysisResult` object with score, meta, headings, images, links, social tags, keywords, and recommendations.
+Returns the full `AnalysisResult` object with score, meta, headings, images, links, technical SEO, keywords, and recommendations.
 
 ## Deployment
 
@@ -67,11 +67,12 @@ git push origin master
 ## Security
 
 - **No data stored** — analyzed pages are fetched server-side and discarded immediately
-- **Rate limited** — in-memory throttling on the API route
-- **CSP headers** — served via `next.config.ts`
-- **Input validation** — URLs are validated and normalized server-side
+- **Rate limited** — in-memory throttling on the API route (10 req/min per IP)
+- **CSP headers** — served via `next.config.ts` and `vercel.json`
+- **Input validation** — URLs are validated, normalized, and length-capped server-side
 - **Timeout** — requests abort after 15 seconds to prevent abuse
-- **User-Agent** — requests identify as `SEOScope/1.0`
+- **Content-Type check** — non-HTML responses are rejected
+- **HTTP status check** — non-200 responses return a clear error
 
 See [SECURITY.md](./SECURITY.md) for the full security policy.
 
