@@ -141,7 +141,7 @@ export async function analyzeTechnical(
   })
 
   // 9 — HTTP protocol
-  const protocol = headers.get("x-forwarded-proto") || headers.get(":scheme") || (wasHttps ? "https" : "http")
+  const protocol = wasHttps ? "https" : "http"
   const via = headers.get("via") || ""
   const cfProto = headers.get("cf-http2") || headers.get("cf-http3") || ""
   let protoLabel = protocol.toUpperCase()
