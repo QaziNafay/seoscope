@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const url = body?.url
+    const sitemap = body?.sitemap
 
     if (!url || typeof url !== "string") {
       return NextResponse.json({ error: "URL is required" }, { status: 400 })
@@ -35,7 +36,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "URL too long" }, { status: 400 })
     }
 
-    const result = await analyzePage(normalized)
+    let sitemapUrl: string | undefined
+    if (sitemap && typeof sitemap === "string") {
+      sitemapUrl = sitemap.trim()
+      try {
+        new URL(sitemapUrl)
+      } catch {
+        return NextResponse.json({ error: "Invalid sitemap URL" }, { status: 400 })
+      }
+    }
+
+    const result = await analyzePage(normalized, sitemapUrl)
     return NextResponse.json(result)
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to analyze page"

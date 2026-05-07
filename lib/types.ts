@@ -59,6 +59,29 @@ export interface TechnicalSeoResult {
   items: TechnicalSeoItem[]
 }
 
+export interface CoreWebVitals {
+  lcp: string | null
+  cls: string | null
+  inp: string | null
+  score: number | null
+}
+
+export interface FrameworkInfo {
+  detected: boolean
+  frameworks: string[]
+  note: string
+}
+
+export interface CrawledPage {
+  url: string
+  title: string
+  description: string
+  h1Count: number
+  wordCount: number
+  hasCanonical: boolean
+  hasViewport: boolean
+}
+
 export interface AnalysisResult {
   url: string
   score: number
@@ -71,4 +94,7 @@ export interface AnalysisResult {
   wordCount: number
   recommendations: string[]
   loadTime: number
+  coreWebVitals: CoreWebVitals | null
+  framework: FrameworkInfo | null
+  crawledPages: CrawledPage[] | null
 }

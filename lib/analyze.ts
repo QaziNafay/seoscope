@@ -6,6 +6,10 @@ import { analyzeImages } from "@/lib/analyzers/images"
 import { analyzeLinks } from "@/lib/analyzers/links"
 import { analyzeKeywords } from "@/lib/analyzers/keywords"
 import { analyzeTechnical } from "@/lib/analyzers/technical"
+import { detectFramework } from "@/lib/analyzers/framework"
+import { analyzePageSpeed } from "@/lib/analyzers/pagespeed"
+import { crawlSitemap } from "@/lib/analyzers/crawl"
+import { cacheGet, cacheSet } from "@/lib/cache"
 
 function getTotalWordCount($: cheerio.CheerioAPI): number {
   const $body = $("body").clone()
@@ -14,48 +18,78 @@ function getTotalWordCount($: cheerio.CheerioAPI): number {
   return text.split(/\s+/).filter((w) => w.length > 0).length
 }
 
-export async function analyzePage(url: string): Promise<AnalysisResult> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 15000)
-
+export async function analyzePage(
+  url: string,
+  sitemapUrl?: string
+): Promise<AnalysisResult> {
+  const cacheKey = url
+  const cached = cacheGet(cacheKey)
   let html: string
-  let loadTime: number
-  let responseHeaders: Headers
+  let responseHeaders: Record<string, string>
+  let finalUrl: string
   let wasHttps: boolean
-  try {
-    const fetchStart = performance.now()
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { "User-Agent": "SEOScope/1.0" },
-      redirect: "follow",
-    })
-    loadTime = Math.round(performance.now() - fetchStart)
-    responseHeaders = res.headers
-    wasHttps = res.url.startsWith("https")
+  let loadTime: number
 
-    if (!res.ok) {
-      throw new Error(`Server returned ${res.status} ${res.statusText}`)
+  if (cached) {
+    html = cached.html
+    responseHeaders = cached.headers
+    finalUrl = cached.url
+    wasHttps = finalUrl.startsWith("https")
+    loadTime = 0
+  } else {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15000)
+
+    try {
+      const fetchStart = performance.now()
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: { "User-Agent": "SEOScope/1.0" },
+        redirect: "follow",
+      })
+      loadTime = Math.round(performance.now() - fetchStart)
+      finalUrl = res.url
+      wasHttps = finalUrl.startsWith("https")
+
+      if (!res.ok) {
+        throw new Error(`Server returned ${res.status} ${res.statusText}`)
+      }
+
+      const contentType = res.headers.get("content-type") || ""
+      if (!contentType.includes("text/html") && !contentType.includes("application/xhtml")) {
+        throw new Error(`Not an HTML page (${contentType.split(";")[0] || "unknown type"})`)
+      }
+
+      html = await res.text()
+      responseHeaders = Object.fromEntries(res.headers.entries())
+
+      cacheSet(cacheKey, { html, headers: responseHeaders, url: finalUrl })
+    } finally {
+      clearTimeout(timeout)
     }
-
-    const contentType = res.headers.get("content-type") || ""
-    if (!contentType.includes("text/html") && !contentType.includes("application/xhtml")) {
-      throw new Error(`Not an HTML page (${contentType.split(";")[0] || "unknown type"})`)
-    }
-
-    html = await res.text()
-  } finally {
-    clearTimeout(timeout)
   }
 
   const $ = cheerio.load(html)
 
-  const meta = analyzeMeta($, url)
+  const meta = analyzeMeta($, finalUrl)
   const headings = analyzeHeadings($)
   const images = analyzeImages($)
-  const links = analyzeLinks($, url)
+  const links = analyzeLinks($, finalUrl)
   const { keywords, wordCount } = analyzeKeywords($)
   const totalWords = getTotalWordCount($)
-  const technical = await analyzeTechnical($, url, wasHttps, responseHeaders, html.length)
+  const framework = detectFramework($)
+  const technical = await analyzeTechnical(
+    $,
+    finalUrl,
+    wasHttps,
+    new Headers(responseHeaders),
+    html.length
+  )
+
+  const [coreWebVitals, crawlResult] = await Promise.all([
+    analyzePageSpeed(finalUrl),
+    sitemapUrl ? crawlSitemap(sitemapUrl) : Promise.resolve(null),
+  ])
 
   let score = 100
   const recommendations: string[] = []
@@ -102,9 +136,7 @@ export async function analyzePage(url: string): Promise<AnalysisResult> {
     recommendations.push(`Add descriptive alt text to ${noAltImages.length} image(s)`)
   }
 
-  if (links.length === 0) {
-    score -= 5
-  }
+  if (links.length === 0) score -= 5
 
   if (!meta.viewport) {
     score -= 5
@@ -125,6 +157,11 @@ export async function analyzePage(url: string): Promise<AnalysisResult> {
   if (noindex?.status === "fail") {
     score -= 10
     recommendations.push("Remove 'noindex' from the robots meta tag so search engines can index this page")
+  }
+
+  if (coreWebVitals?.score !== null && coreWebVitals.score < 50) {
+    score -= 5
+    recommendations.push("Improve Core Web Vitals — your PageSpeed score is low, which impacts search ranking")
   }
 
   score = Math.max(0, score)
@@ -148,7 +185,7 @@ export async function analyzePage(url: string): Promise<AnalysisResult> {
   }
 
   return {
-    url,
+    url: finalUrl,
     score,
     meta,
     headings,
@@ -159,5 +196,8 @@ export async function analyzePage(url: string): Promise<AnalysisResult> {
     wordCount,
     recommendations,
     loadTime,
+    coreWebVitals,
+    framework,
+    crawledPages: crawlResult?.pages ?? null,
   }
 }

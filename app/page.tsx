@@ -11,11 +11,16 @@ import { LinksPanel } from "@/app/components/LinksPanel"
 import { TechnicalPanel } from "@/app/components/TechnicalPanel"
 import { KeywordsPanel } from "@/app/components/KeywordsPanel"
 import { RecommendationsPanel } from "@/app/components/RecommendationsPanel"
+import { CoreWebVitalsPanel } from "@/app/components/CoreWebVitalsPanel"
+import { FrameworkBanner } from "@/app/components/FrameworkBanner"
+import { CrawlPanel } from "@/app/components/CrawlPanel"
 
 export default function Home() {
   const [result, setResult] = useState<AnalysisResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showSitemap, setShowSitemap] = useState(false)
+  const [sitemapUrl, setSitemapUrl] = useState("")
 
   const analyze = useCallback(async (url: string) => {
     setLoading(true)
@@ -23,10 +28,17 @@ export default function Home() {
     setResult(null)
 
     try {
+      const body: Record<string, string> = { url }
+      if (sitemapUrl.trim()) {
+        let sm = sitemapUrl.trim()
+        if (!/^https?:\/\//i.test(sm)) sm = "https://" + sm
+        body.sitemap = sm
+      }
+
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify(body),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -39,7 +51,7 @@ export default function Home() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [sitemapUrl])
 
   return (
     <main className="max-w-5xl mx-auto px-4 py-10">
@@ -54,6 +66,25 @@ export default function Home() {
 
       <UrlInput onSubmit={analyze} loading={loading} />
 
+      <div className="max-w-2xl mx-auto mt-2">
+        <button
+          type="button"
+          className="text-xs text-gray-400 hover:text-gray-600 underline cursor-pointer"
+          onClick={() => setShowSitemap(!showSitemap)}
+        >
+          {showSitemap ? "— Hide sitemap crawl" : "+ Add sitemap URL for multi-page crawl"}
+        </button>
+        {showSitemap && (
+          <input
+            type="text"
+            value={sitemapUrl}
+            onChange={(e) => setSitemapUrl(e.target.value)}
+            placeholder="https://example.com/sitemap.xml"
+            className="mt-2 w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        )}
+      </div>
+
       {error && (
         <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
           {error}
@@ -62,12 +93,14 @@ export default function Home() {
 
       {loading && (
         <div className="mt-10 text-center text-gray-400 animate-pulse">
-          Fetching and analyzing the page…
+          {sitemapUrl.trim() ? "Fetching page, PageSpeed, and sitemap…" : "Fetching and analyzing the page…"}
         </div>
       )}
 
       {result && (
         <div className="mt-10 space-y-6">
+          {result.framework && <FrameworkBanner framework={result.framework} />}
+
           <ScoreChart score={result.score} loadTime={result.loadTime} wordCount={result.wordCount} />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -78,6 +111,12 @@ export default function Home() {
             <LinksPanel links={result.links} />
             <KeywordsPanel keywords={result.keywords} />
           </div>
+
+          {result.coreWebVitals && (
+            <CoreWebVitalsPanel vitals={result.coreWebVitals} />
+          )}
+
+          {result.crawledPages && <CrawlPanel pages={result.crawledPages} />}
 
           <RecommendationsPanel recommendations={result.recommendations} />
         </div>
