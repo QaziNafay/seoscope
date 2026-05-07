@@ -4,8 +4,8 @@ import { analyzeMeta } from "@/lib/analyzers/meta"
 import { analyzeHeadings } from "@/lib/analyzers/headings"
 import { analyzeImages } from "@/lib/analyzers/images"
 import { analyzeLinks } from "@/lib/analyzers/links"
-import { analyzeSocial } from "@/lib/analyzers/social"
 import { analyzeKeywords } from "@/lib/analyzers/keywords"
+import { analyzeTechnical } from "@/lib/analyzers/technical"
 
 function getTotalWordCount($: cheerio.CheerioAPI): number {
   const $body = $("body").clone()
@@ -20,6 +20,8 @@ export async function analyzePage(url: string): Promise<AnalysisResult> {
 
   let html: string
   let loadTime: number
+  let responseHeaders: Headers
+  let wasHttps: boolean
   try {
     const fetchStart = performance.now()
     const res = await fetch(url, {
@@ -28,6 +30,8 @@ export async function analyzePage(url: string): Promise<AnalysisResult> {
       redirect: "follow",
     })
     loadTime = Math.round(performance.now() - fetchStart)
+    responseHeaders = res.headers
+    wasHttps = res.url.startsWith("https")
 
     if (!res.ok) {
       throw new Error(`Server returned ${res.status} ${res.statusText}`)
@@ -49,11 +53,12 @@ export async function analyzePage(url: string): Promise<AnalysisResult> {
   const headings = analyzeHeadings($)
   const images = analyzeImages($)
   const links = analyzeLinks($, url)
-  const social = analyzeSocial($)
   const { keywords, wordCount } = analyzeKeywords($)
   const totalWords = getTotalWordCount($)
+  const technical = await analyzeTechnical($, url, wasHttps, responseHeaders, html.length)
 
   let score = 100
+  const recommendations: string[] = []
 
   if (!meta.title || meta.titleLength === 0) {
     score -= 10
@@ -71,7 +76,10 @@ export async function analyzePage(url: string): Promise<AnalysisResult> {
     score -= 3
   }
 
-  if (!meta.canonical) score -= 3
+  if (!meta.canonical) {
+    score -= 3
+    recommendations.push("Add a canonical URL tag to prevent duplicate content issues")
+  }
 
   if (headings.h1.length === 0) {
     score -= 8
@@ -89,67 +97,54 @@ export async function analyzePage(url: string): Promise<AnalysisResult> {
       score -= 4
     }
   }
-
-  if (links.length === 0) {
-    score -= 5
-  } else {
-    const nofollow = links.filter((l) => !l.isFollowable).length
-    if (nofollow > links.length * 0.5) {
-      score -= 3
-    }
-  }
-
-  if (!social.ogTitle) score -= 5
-  if (!social.ogDescription) score -= 3
-  if (!social.ogImage) score -= 3
-
-  if (!meta.viewport) score -= 5
-
-  if (totalWords < 300) score -= 5
-
-  score = Math.max(0, score)
-
-  const recommendations: string[] = []
-  if (!meta.title) {
-    recommendations.push("Add a unique, descriptive <title> tag (50-60 characters)")
-  } else if (meta.titleLength > 60) {
-    recommendations.push(`Shorten the title from ${meta.titleLength} to under 60 characters`)
-  }
-
-  if (!meta.description) {
-    recommendations.push("Add a meta description (120-160 characters summarizing the page)")
-  } else if (meta.descriptionLength > 160) {
-    recommendations.push(`Trim the meta description from ${meta.descriptionLength} to under 160 characters`)
-  }
-
-  if (headings.h1.length === 0) {
-    recommendations.push("Add one H1 tag that matches the page topic")
-  } else if (headings.h1.length > 1) {
-    recommendations.push("Keep only one H1 tag and change the rest to H2 or lower")
-  }
-
   const noAltImages = images.filter((i) => !i.hasAlt)
   if (noAltImages.length > 0) {
     recommendations.push(`Add descriptive alt text to ${noAltImages.length} image(s)`)
   }
 
-  if (!social.ogTitle) {
-    recommendations.push("Add og:title meta tag for better social media previews")
-  }
-  if (!social.ogImage) {
-    recommendations.push("Add og:image meta tag so links show a preview image when shared")
-  }
-
-  if (!meta.canonical) {
-    recommendations.push("Add a canonical URL tag to prevent duplicate content issues")
+  if (links.length === 0) {
+    score -= 5
   }
 
   if (!meta.viewport) {
+    score -= 5
     recommendations.push("Add a viewport meta tag for mobile responsiveness")
   }
 
   if (totalWords < 300) {
+    score -= 5
     recommendations.push("Add more content — aim for at least 300 words per page")
+  }
+
+  if (!wasHttps) {
+    score -= 8
+    recommendations.push("Switch to HTTPS — it's a ranking signal and required for browser trust")
+  }
+
+  const noindex = technical.items.find((i) => i.label === "Crawlability")
+  if (noindex?.status === "fail") {
+    score -= 10
+    recommendations.push("Remove 'noindex' from the robots meta tag so search engines can index this page")
+  }
+
+  score = Math.max(0, score)
+
+  if (!meta.title) {
+    recommendations.unshift("Add a unique, descriptive <title> tag (50-60 characters)")
+  } else if (meta.titleLength > 60) {
+    recommendations.unshift(`Shorten the title from ${meta.titleLength} to under 60 characters`)
+  }
+
+  if (!meta.description) {
+    recommendations.unshift("Add a meta description (120-160 characters summarizing the page)")
+  } else if (meta.descriptionLength > 160) {
+    recommendations.unshift(`Trim the meta description from ${meta.descriptionLength} to under 160 characters`)
+  }
+
+  if (headings.h1.length === 0) {
+    recommendations.unshift("Add one H1 tag that matches the page topic")
+  } else if (headings.h1.length > 1) {
+    recommendations.unshift("Keep only one H1 tag and change the rest to H2 or lower")
   }
 
   return {
@@ -159,7 +154,7 @@ export async function analyzePage(url: string): Promise<AnalysisResult> {
     headings,
     images,
     links,
-    social,
+    technical,
     keywords,
     wordCount,
     recommendations,

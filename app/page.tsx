@@ -8,7 +8,7 @@ import { MetaPanel } from "@/app/components/MetaPanel"
 import { HeadingsPanel } from "@/app/components/HeadingsPanel"
 import { ImagesPanel } from "@/app/components/ImagesPanel"
 import { LinksPanel } from "@/app/components/LinksPanel"
-import { SocialPanel } from "@/app/components/SocialPanel"
+import { TechnicalPanel } from "@/app/components/TechnicalPanel"
 import { KeywordsPanel } from "@/app/components/KeywordsPanel"
 import { RecommendationsPanel } from "@/app/components/RecommendationsPanel"
 
@@ -72,7 +72,7 @@ export default function Home() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <MetaPanel meta={result.meta} />
-            <SocialPanel social={result.social} />
+            <TechnicalPanel technical={result.technical} />
             <HeadingsPanel headings={result.headings} />
             <ImagesPanel images={result.images} />
             <LinksPanel links={result.links} />

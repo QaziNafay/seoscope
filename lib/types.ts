@@ -48,6 +48,17 @@ export interface KeywordResult {
   density: number
 }
 
+export interface TechnicalSeoItem {
+  label: string
+  status: "pass" | "warn" | "fail" | "info"
+  value: string
+  detail: string
+}
+
+export interface TechnicalSeoResult {
+  items: TechnicalSeoItem[]
+}
+
 export interface AnalysisResult {
   url: string
   score: number
@@ -55,7 +66,7 @@ export interface AnalysisResult {
   headings: HeadingResult
   images: ImageResult[]
   links: LinkResult[]
-  social: SocialResult
+  technical: TechnicalSeoResult
   keywords: KeywordResult[]
   wordCount: number
   recommendations: string[]
