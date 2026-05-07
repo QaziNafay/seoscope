@@ -16,6 +16,9 @@ const STOP_WORDS = new Set([
   "up", "out", "off", "down", "here", "there", "when", "where", "why",
   "how", "what", "which", "who", "whom", "while", "during", "through",
   "until", "against", "within", "without", "along", "around", "among",
+  "dont", "cant", "wont", "didnt", "doesnt", "hasnt", "havent",
+  "hadnt", "couldnt", "wouldnt", "shouldnt", "isnt", "arent",
+  "wasnt", "werent", "neednt", "mightnt", "mustnt",
 ])
 
 export function analyzeKeywords(

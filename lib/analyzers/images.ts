@@ -6,9 +6,15 @@ export function analyzeImages($: cheerio.CheerioAPI): ImageResult[] {
 
   $("img").each((_, el) => {
     const src = $(el).attr("src") || ""
-    if (!src) return
-    const alt = $(el).attr("alt")?.trim() || null
-    results.push({ src, alt, hasAlt: alt !== null && alt.length > 0 })
+    if (!src || src.startsWith("data:")) return
+
+    const alt = $(el).attr("alt")
+    const hasAlt = alt !== undefined
+    results.push({
+      src,
+      alt: alt?.trim() ?? null,
+      hasAlt,
+    })
   })
 
   return results
