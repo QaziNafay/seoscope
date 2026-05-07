@@ -19,15 +19,17 @@ const STOP_WORDS = new Set([
 ])
 
 export function analyzeKeywords(
-  $: cheerio.CheerioAPI,
-  wordCount: number
+  $: cheerio.CheerioAPI
 ): { keywords: KeywordResult[]; wordCount: number } {
-  const text = $("body").text().toLowerCase()
+  const $body = $("body").clone()
+  $body.find("script, style, noscript, svg, canvas, template, [aria-hidden=true]").remove()
+  const text = $body.text().toLowerCase()
   const words = text
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
     .filter((w) => w.length > 2 && !STOP_WORDS.has(w))
 
+  const totalWords = words.length
   const freq = new Map<string, number>()
   for (const w of words) {
     freq.set(w, (freq.get(w) || 0) + 1)
@@ -39,8 +41,8 @@ export function analyzeKeywords(
     .map(([word, count]) => ({
       word,
       count,
-      density: wordCount > 0 ? parseFloat(((count / wordCount) * 100).toFixed(2)) : 0,
+      density: totalWords > 0 ? parseFloat(((count / totalWords) * 100).toFixed(2)) : 0,
     }))
 
-  return { keywords: sorted, wordCount: words.length }
+  return { keywords: sorted, wordCount: totalWords }
 }

@@ -33,7 +33,7 @@ export async function analyzePage(url: string): Promise<AnalysisResult> {
   const images = analyzeImages($)
   const links = analyzeLinks($, url)
   const social = analyzeSocial($)
-  const { keywords, wordCount } = analyzeKeywords($, 0)
+  const { keywords, wordCount } = analyzeKeywords($)
 
   const issues: string[] = []
   let score = 100
